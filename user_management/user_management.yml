@@ -1,0 +1,50 @@
+---
+- name: Manage Users on Servers
+  hosts: all
+  become: yes
+
+  vars:
+    users:
+      - name: devuser
+        groups: sudo
+        shell: /bin/bash
+
+      - name: testuser
+        groups: developers
+        shell: /bin/bash
+
+  tasks:
+
+    - name: Create groups
+      group:
+        name: "{{ item.groups }}"
+        state: present
+      loop: "{{ users }}"
+
+    - name: Create users
+      user:
+        name: "{{ item.name }}"
+        groups: "{{ item.groups }}"
+        shell: "{{ item.shell }}"
+        create_home: yes
+        state: present
+      loop: "{{ users }}"
+
+    - name: Set password for users
+      user:
+        name: "{{ item.name }}"
+        password: "{{ 'Password@123' | password_hash('sha512') }}"
+      loop: "{{ users }}"
+
+    - name: Add SSH key (optional but powerful)
+      authorized_key:
+        user: "{{ item.name }}"
+        state: present
+        key: "{{ lookup('file', 'id_rsa.pub') }}"
+      loop: "{{ users }}"
+
+    - name: Ensure sudo access (for devuser)
+      copy:
+        dest: "/etc/sudoers.d/devuser"
+        content: "devuser ALL=(ALL) NOPASSWD:ALL"
+        mode: '0440'
